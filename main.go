@@ -11,7 +11,7 @@ import (
 )
 
 type model struct {
-	title     string
+	titles    []string
 	startTime time.Time
 	elapsed   time.Duration
 	running   bool
@@ -22,13 +22,13 @@ type tickMsg time.Time
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Please provide a title as a command-line argument")
+		fmt.Println("Please provide at least one title as a command-line argument")
 		os.Exit(1)
 	}
-	title := strings.Join(os.Args[1:], " ")
+	titles := os.Args[1:] // Take all arguments as titles
 
 	m := model{
-		title:     title,
+		titles:    titles,
 		startTime: time.Now(),
 		running:   true,
 	}
@@ -76,7 +76,13 @@ func (m model) View() string {
 	hours := int(m.elapsed.Hours())
 	minutes := int(m.elapsed.Minutes()) % 60
 	seconds := int(m.elapsed.Seconds()) % 60
-	return fmt.Sprintf("Title: %s\nTimer: %02d:%02d:%02d\n", m.title, hours, minutes, seconds)
+
+	// Build title display with hierarchical numbering
+	var titleLines []string
+	for i, title := range m.titles {
+		titleLines = append(titleLines, fmt.Sprintf("Title %d: %s", i+1, title))
+	}
+	return fmt.Sprintf("%s\nTimer: %02d:%02d:%02d\n", strings.Join(titleLines, "\n"), hours, minutes, seconds)
 }
 
 func tickCmd() tea.Cmd {
@@ -104,17 +110,50 @@ func (m model) logToCSV() error {
 	if err != nil {
 		return fmt.Errorf("failed to stat file: %v", err)
 	}
+
+	// Read existing CSV to determine max number of titles
+	maxTitles := len(m.titles)
+	if fileInfo.Size() > 0 {
+		// Open file for reading to check existing headers
+		readFile, err := os.Open("talogo.csv")
+		if err != nil {
+			return fmt.Errorf("failed to read CSV file: %v", err)
+		}
+		defer readFile.Close()
+
+		reader := csv.NewReader(readFile)
+		headers, err := reader.Read()
+		if err != nil {
+			return fmt.Errorf("failed to read CSV headers: %v", err)
+		}
+		// Count title columns (headers after duration_seconds)
+		titleCount := len(headers) - 3 // start_time, end_time, duration_seconds
+		if titleCount > maxTitles {
+			maxTitles = titleCount
+		}
+	}
+
+	// Write header if file is empty
 	if fileInfo.Size() == 0 {
-		if err := writer.Write([]string{"title", "start_time", "end_time", "duration_seconds"}); err != nil {
+		header := []string{"start_time", "end_time", "duration_seconds"}
+		for i := 1; i <= maxTitles; i++ {
+			header = append(header, fmt.Sprintf("title%d", i))
+		}
+		if err := writer.Write(header); err != nil {
 			return fmt.Errorf("failed to write CSV header: %v", err)
 		}
 	}
 
+	// Create record with fixed fields followed by titles
 	record := []string{
-		m.title,
 		m.startTime.Format(time.RFC3339),
 		endTime.Format(time.RFC3339),
 		fmt.Sprintf("%d", duration),
+	}
+	// Add titles, padding with empty strings if fewer than maxTitles
+	record = append(record, m.titles...)
+	for len(record) < 3+maxTitles {
+		record = append(record, "")
 	}
 
 	if err := writer.Write(record); err != nil {
