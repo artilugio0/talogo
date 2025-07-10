@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -71,8 +70,8 @@ func generateSummary(logFile string) error {
 			continue // Skip header row
 		}
 
-		// Ensure record has at least start_time, end_time, duration_seconds
-		if len(record) < 3 {
+		// Ensure record has at least start_time, end_time
+		if len(record) < 2 {
 			fmt.Fprintf(os.Stderr, "Skipping malformed record on line %d: too few fields (%d)\n", i+1, len(record))
 			continue
 		}
@@ -84,13 +83,19 @@ func generateSummary(logFile string) error {
 			continue
 		}
 
-		// Parse duration
-		durationSeconds, err := strconv.Atoi(record[2])
+		// Parse end time
+		endTime, err := time.Parse(time.RFC3339, record[1])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Skipping record on line %d: invalid duration (%s)\n", i+1, record[2])
+			fmt.Fprintf(os.Stderr, "Skipping record on line %d: invalid end time (%s)\n", i+1, record[1])
 			continue
 		}
-		duration := time.Duration(durationSeconds) * time.Second
+
+		// Calculate duration
+		duration := endTime.Sub(startTime)
+		if duration < 0 {
+			fmt.Fprintf(os.Stderr, "Skipping record on line %d: negative duration\n", i+1)
+			continue
+		}
 
 		// Get date in YYYY-MM-DD format
 		dateStr := startTime.Format("2006-01-02")
@@ -102,7 +107,7 @@ func generateSummary(logFile string) error {
 
 		// Build task hierarchy
 		current := dailyTasks[dateStr]
-		for j := 3; j < len(record); j++ {
+		for j := 2; j < len(record); j++ {
 			if record[j] == "" {
 				break // No more titles
 			}

@@ -104,7 +104,6 @@ func tickCmd() tea.Cmd {
 
 func (m model) logToCSV() error {
 	endTime := m.startTime.Add(m.elapsed)
-	duration := int(m.elapsed.Seconds())
 
 	// Ensure file is created with proper permissions
 	file, err := os.OpenFile(m.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -137,8 +136,8 @@ func (m model) logToCSV() error {
 		if err != nil {
 			return fmt.Errorf("failed to read CSV headers: %v", err)
 		}
-		// Count title columns (headers after duration_seconds)
-		titleCount := len(headers) - 3 // start_time, end_time, duration_seconds
+		// Count title columns (headers after end_time)
+		titleCount := len(headers) - 2 // start_time, end_time
 		if titleCount > maxTitles {
 			maxTitles = titleCount
 		}
@@ -146,7 +145,7 @@ func (m model) logToCSV() error {
 
 	// Write header if file is empty
 	if fileInfo.Size() == 0 {
-		header := []string{"start_time", "end_time", "duration_seconds"}
+		header := []string{"start_time", "end_time"}
 		for i := 1; i <= maxTitles; i++ {
 			header = append(header, fmt.Sprintf("title%d", i))
 		}
@@ -159,11 +158,10 @@ func (m model) logToCSV() error {
 	record := []string{
 		m.startTime.Format(time.RFC3339),
 		endTime.Format(time.RFC3339),
-		fmt.Sprintf("%d", duration),
 	}
 	// Add titles, padding with empty strings if fewer than maxTitles
 	record = append(record, m.titles...)
-	for len(record) < 3+maxTitles {
+	for len(record) < 2+maxTitles {
 		record = append(record, "")
 	}
 
