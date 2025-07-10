@@ -103,6 +103,7 @@ func tickCmd() tea.Cmd {
 }
 
 func (m model) logToCSV() error {
+	startTime := m.startTime
 	endTime := m.startTime.Add(m.elapsed)
 
 	// Ensure file is created with proper permissions
@@ -154,19 +155,39 @@ func (m model) logToCSV() error {
 		}
 	}
 
-	// Create record with fixed fields followed by titles
-	record := []string{
-		m.startTime.Format(time.RFC3339),
-		endTime.Format(time.RFC3339),
-	}
-	// Add titles, padding with empty strings if fewer than maxTitles
-	record = append(record, m.titles...)
-	for len(record) < 2+maxTitles {
-		record = append(record, "")
-	}
+	// Split into daily records if spanning multiple days
+	currentStart := startTime
+	for {
+		year, month, day := currentStart.Date()
+		startOfDay := time.Date(year, month, day, 0, 0, 0, 0, currentStart.Location())
+		endOfDay := startOfDay.Add(24*time.Hour - time.Nanosecond)
 
-	if err := writer.Write(record); err != nil {
-		return fmt.Errorf("failed to write CSV record: %v", err)
+		currentEnd := endOfDay
+		if endOfDay.After(endTime) {
+			currentEnd = endTime
+		}
+
+		// Create record
+		record := []string{
+			currentStart.Format(time.RFC3339),
+			currentEnd.Format(time.RFC3339),
+		}
+		// Add titles, padding with empty strings if fewer than maxTitles
+		record = append(record, m.titles...)
+		for len(record) < 2+maxTitles {
+			record = append(record, "")
+		}
+
+		if err := writer.Write(record); err != nil {
+			return fmt.Errorf("failed to write CSV record: %v", err)
+		}
+
+		if currentEnd.Equal(endTime) {
+			break
+		}
+
+		// Move to next day
+		currentStart = endOfDay.Add(time.Nanosecond)
 	}
 
 	// Ensure all data is written to disk
