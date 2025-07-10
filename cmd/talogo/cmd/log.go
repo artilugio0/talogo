@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"encoding/csv"
@@ -8,9 +8,15 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
+)
+
+var (
+	logCmdLogFile string
 )
 
 type model struct {
+	logFile   string
 	titles    []string
 	startTime time.Time
 	elapsed   time.Duration
@@ -20,25 +26,30 @@ type model struct {
 
 type tickMsg time.Time
 
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Please provide at least one title as a command-line argument")
-		os.Exit(1)
-	}
-	titles := os.Args[1:] // Take all arguments as titles
+var logCmd = &cobra.Command{
+	Use:   "log TITLE {SUBTITLES}",
+	Short: "Start tracking a task and log to file when finished",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		m := model{
+			logFile:   logCmdLogFile,
+			titles:    args, // Take all arguments as titles
+			startTime: time.Now(),
+			running:   true,
+		}
 
-	m := model{
-		titles:    titles,
-		startTime: time.Now(),
-		running:   true,
-	}
+		// Create program without AltScreen
+		p := tea.NewProgram(m)
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
 
-	// Create program without AltScreen
-	p := tea.NewProgram(m)
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
-	}
+func init() {
+	logCmd.Flags().StringVarP(&logCmdLogFile, "file", "f", "./talogo.csv", "Log file to write")
+	rootCmd.AddCommand(logCmd)
 }
 
 func (m model) Init() tea.Cmd {
@@ -68,7 +79,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.quitting {
-		return "Timer stopped. Data saved to talogo.csv\n"
+		return "Timer stopped. Data saved to " + m.logFile + "\n"
 	}
 	if !m.running {
 		return "Timer stopped.\n"
@@ -96,7 +107,7 @@ func (m model) logToCSV() error {
 	duration := int(m.elapsed.Seconds())
 
 	// Ensure file is created with proper permissions
-	file, err := os.OpenFile("talogo.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(m.logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open/create CSV file: %v", err)
 	}
@@ -115,7 +126,7 @@ func (m model) logToCSV() error {
 	maxTitles := len(m.titles)
 	if fileInfo.Size() > 0 {
 		// Open file for reading to check existing headers
-		readFile, err := os.Open("talogo.csv")
+		readFile, err := os.Open(m.logFile)
 		if err != nil {
 			return fmt.Errorf("failed to read CSV file: %v", err)
 		}

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 REPO_ROOT="$(realpath "$SCRIPT_DIR/..")"
 
 # Define the input and output directories relative to the repository root.
-SRC_DIR="$REPO_ROOT"
+SRC_DIR="$REPO_ROOT/cmd/talogo"
 BUILD_DIR="$REPO_ROOT/build"
 BINARY_NAME="talogo"
 
