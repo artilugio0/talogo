@@ -159,7 +159,6 @@ func (m model) logToCSV() error {
 	currentStart := startTime
 	for {
 		year, month, day := currentStart.Date()
-		startOfDay := time.Date(year, month, day, 0, 0, 0, 0, currentStart.Location())
 		nextDay := time.Date(year, month, day+1, 0, 0, 0, 0, currentStart.Location())
 		endOfDay := nextDay.Add(-time.Nanosecond)
 

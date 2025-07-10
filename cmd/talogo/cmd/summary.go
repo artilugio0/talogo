@@ -107,6 +107,7 @@ func generateSummary(logFile string) error {
 
 		// Build task hierarchy
 		current := dailyTasks[dateStr]
+		var leaf *TaskNode
 		for j := 2; j < len(record); j++ {
 			if record[j] == "" {
 				break // No more titles
@@ -121,9 +122,12 @@ func generateSummary(logFile string) error {
 					Children: make(map[string]*TaskNode),
 				}
 			}
-			current[taskName].Duration += duration
 			current[taskName].TotalTime += duration
+			leaf = current[taskName]
 			current = current[taskName].Children
+		}
+		if leaf != nil {
+			leaf.Duration += duration
 		}
 	}
 
@@ -175,7 +179,7 @@ func printSubtasks(tasks map[string]*TaskNode, indent int) {
 
 	for _, taskName := range taskNames {
 		task := tasks[taskName]
-		fmt.Printf("%s%s: %.2f hs\n", strings.Repeat(" ", indent), taskName, task.Duration.Hours())
+		fmt.Printf("%s%s: %.2f hs\n", strings.Repeat(" ", indent), taskName, task.TotalTime.Hours())
 		printSubtasks(task.Children, indent+2)
 	}
 }
